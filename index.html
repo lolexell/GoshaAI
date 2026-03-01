@@ -1,16 +1,220 @@
 <!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GoshaAI — Искусственный Интеллект</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <title>GoshaAI · Claude Sonnet 4.6</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #05060b;
+      color: #f5f5f7;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .app {
+      width: 420px;
+      max-width: 100%;
+      height: 640px;
+      background: radial-gradient(circle at top, #181827 0, #05060b 55%);
+      border-radius: 28px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #2b2b3a;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.75);
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 2px solid #6366f1;
+      background: #111323;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+    }
+
+    .title { font-weight: 600; font-size: 15px; }
+    .subtitle { font-size: 11px; color: #a0a0c0; }
+
+    .chat {
+      flex: 1;
+      margin-top: 8px;
+      padding: 10px;
+      border-radius: 16px;
+      background: rgba(9,10,18,0.9);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .msg {
+      max-width: 80%;
+      padding: 8px 10px;
+      border-radius: 12px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: #2c2f52;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.bot {
+      align-self: flex-start;
+      background: #111323;
+      border-bottom-left-radius: 4px;
+    }
+    .footer {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #input {
+      flex: 1;
+      resize: none;
+      border-radius: 16px;
+      border: 1px solid #343654;
+      background: #090a12;
+      color: #f5f5f7;
+      padding: 8px 10px;
+      height: 40px;
+      font-size: 13px;
+    }
+    #send {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg,#6366f1,#a855f7);
+      color: #fff;
+      cursor: pointer;
+      font-size: 18px;
+    }
+    #send:disabled { opacity: .6; cursor: default; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="avatar">
+        <img src="https://cdn.discordapp.com/attachments/1455504595978813555/1477598469693898865/560F9A3C-0341-44AE-84C9-59349EAAA90E.png?ex=69a5584f&is=69a406cf&hm=4886e13aab965d306b7bcb925ecdcd5247e2e67561a8a3e8f8a557e0de9dde56&"
+             alt="GoshaAI">
+      </div>
+      <div>
+        <div class="title">GoshaAI</div>
+        <div class="subtitle">на Claude Sonnet 4.6</div>
+      </div>
+    </div>
+
+    <div id="chat" class="chat">
+      <div class="msg bot">
+        Йо, я GoshaAI! Пиши, разберёмся по красоте.
+      </div>
+    </div>
+
+    <div class="footer">
+      <textarea id="input" placeholder="Напиши запрос..." autocomplete="off"></textarea>
+      <button id="send">➤</button>
+    </div>
+  </div>
+
+  <script>
+    // === НАСТРОЙКИ CLAUDE ===
+    const API_URL = "https://api.anthropic.com/v1/messages"; // Messages API[web:42][web:50]
+    const API_KEY = "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";           // вставь свой ключ
+    const MODEL   = "claude-sonnet-4.6";                     // имя модели у твоего провайдера[web:49]
+
+    const chatEl = document.getElementById("chat");
+    const inputEl = document.getElementById("input");
+    const sendBtn = document.getElementById("send");
+
+    function addMessage(text, who) {
+      const div = document.createElement("div");
+      div.className = "msg " + who;
+      div.textContent = text;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      history.push({ role: "user", content: text });
+      addMessage(text, "user");
+      inputEl.value = "";
+      sendBtn.disabled = true;
+
+      const loading = document.createElement("div");
+      loading.className = "msg bot";
+      loading.textContent = "Гоша думает...";
+      chatEl.appendChild(loading);
+      chatEl.scrollTop = chatEl.scrollHeight;
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY,              // ключ[web:47]
+            "anthropic-version": "2023-06-01" // версия Messages API[web:42][web:50]
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: 512,
+            messages: history.map(m => ({
+              role: m.role === "user" ? "user" : "assistant",
+              content: m.content
+            }))
+          })
+        });
+
+        const data = await res.json();
+        loading.remove();
+
+        const answer =
+          data.content && data.content[0] && data.content[0].text
+            ? data.content[0].text
+            : JSON.stringify(data, null, 2);
+
+        history.push({ role: "assistant", content: answer });
+        addMessage(answer, "bot");
+      } catch (e) {
+        loading.remove();
+        addMessage("Ошибка запроса: " + e.message, "bot");
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    inputEl.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+</body>
 </html>
