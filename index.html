@@ -129,7 +129,7 @@
 
     <div id="chat" class="chat">
       <div class="msg bot">
-        Йо, я GoshaAI! Пиши, разберёмся по красоте.
+        Йо, я GoshaAI в образе Годжо Сатору. Пиши, разберёмся по красоте.
       </div>
     </div>
 
@@ -140,14 +140,22 @@
   </div>
 
   <script>
-    // === НАСТРОЙКИ CLAUDE ===
-    const API_URL = "https://api.anthropic.com/v1/messages"; // Messages API[web:42][web:50]
-    const API_KEY = "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";           // вставь свой ключ
-    const MODEL   = "claude-sonnet-4.6";                     // имя модели у твоего провайдера[web:49]
+    const API_URL = "https://api.anthropic.com/v1/messages";
+    const API_KEY = "YOUR_ANTHROPIC_API_KEY_HERE";
+    const MODEL   = "claude-sonnet-4.6";
 
-    const chatEl = document.getElementById("chat");
+    const chatEl  = document.getElementById("chat");
     const inputEl = document.getElementById("input");
     const sendBtn = document.getElementById("send");
+
+    const history = [
+      {
+        role: "user",
+        content:
+          "Ты GoshaAI в образе Годжо Сатору из 'Jujutsu Kaisen': дерзкий, уверенный, " +
+          "ироничный, но добрый. Отвечай живо, по делу, без токсичности, можно с аниме‑референсами."
+      }
+    ];
 
     function addMessage(text, who) {
       const div = document.createElement("div");
@@ -177,8 +185,9 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": API_KEY,              // ключ[web:47]
-            "anthropic-version": "2023-06-01" // версия Messages API[web:42][web:50]
+            "x-api-key": API_KEY,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true" // важный заголовок для фронта[web:59]
           },
           body: JSON.stringify({
             model: MODEL,
@@ -191,7 +200,15 @@
         });
 
         const data = await res.json();
+
         loading.remove();
+
+        if (!res.ok) {
+          console.error("Anthropic error:", data);
+          addMessage("Ошибка API: " + (data.error?.message || res.status), "bot");
+          sendBtn.disabled = false;
+          return;
+        }
 
         const answer =
           data.content && data.content[0] && data.content[0].text
@@ -202,6 +219,7 @@
         addMessage(answer, "bot");
       } catch (e) {
         loading.remove();
+        console.error(e);
         addMessage("Ошибка запроса: " + e.message, "bot");
       } finally {
         sendBtn.disabled = false;
